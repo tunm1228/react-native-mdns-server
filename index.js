@@ -2,10 +2,10 @@
 
 /*jshint esversion: 6*/
 
-const dgram = require('dgram');
-const packet = require('dns-packet');
-const events = require('events');
-const os = require('os');
+const dgram = require('react-native-udp');
+const packet = require('react-native-dns-packet');
+const Emitter = require('tiny-emitter');
+const os = require('react-native-os');
 
 const MDNS_IPV4 = '224.0.0.251';
 const MDNS_IPV6 = 'FF02::FB';
@@ -13,7 +13,7 @@ const MDNS_PORT = 5353;
 
 module.exports = function (options) {
   options = options || {};
-  var emitter = new events.EventEmitter();
+  var emitter = new Emitter();
   var mDNS = {
     config: {
       reuseAddr: typeof options.reuseAddr === 'undefined' ? true : options.reuseAddr,
@@ -40,12 +40,12 @@ module.exports = function (options) {
       // create sockets on interfaces
       mDNS.interfaces = mDNS.config.interfaces.slice();
       mDNS.createSockets()
-      .then(() => {
-        emitter.emit('ready');
-      })
-      .catch((err) => {
-        emitter.emit('error', err);
-      });
+        .then(() => {
+          emitter.emit('ready');
+        })
+        .catch((err) => {
+          emitter.emit('error', err);
+        });
     },
 
     // create socket for each interface
@@ -64,13 +64,13 @@ module.exports = function (options) {
           else {
             // process this interface
             mDNS.createNewSockets(mDNS.interfaces[i])
-            .then((listening) => {
-              if (listening) {
-                mDNS.interfaces[i].listening = true;
-              }
-              // process next interface
-              processInterface(i + 1);
-            });
+              .then((listening) => {
+                if (listening) {
+                  mDNS.interfaces[i].listening = true;
+                }
+                // process next interface
+                processInterface(i + 1);
+              });
           }
         };
         // start processing
@@ -82,18 +82,18 @@ module.exports = function (options) {
     createNewSockets: function (iface) {
       return new Promise((resolve, reject) => {
         mDNS.createSendSocket(iface)
-        .then(function () {
-          return mDNS.createReceiveSocket(iface);
-        })
-        .then(function () {
-          resolve(true);
-        })
-        .catch(function (err) {
-          iface.socketRecv = null;
-          iface.socketSend = null;
-          // socket failure, continue to next interface
-          resolve(false);
-        });
+          .then(function () {
+            return mDNS.createReceiveSocket(iface);
+          })
+          .then(function () {
+            resolve(true);
+          })
+          .catch(function (err) {
+            iface.socketRecv = null;
+            iface.socketSend = null;
+            // socket failure, continue to next interface
+            resolve(false);
+          });
       });
     },
 
@@ -105,22 +105,22 @@ module.exports = function (options) {
         };
 
         mDNS.getReceiveSocket(iface)
-        .then(success => {
-          if (!success) {
-            // try again with catch-all address
-            iface.bindStatus.catchAll = true;
-          }
-          return success || mDNS.getReceiveSocket(iface);
-        })
-        .then(success => {
-          if (!success) {
-            reject();
-          }
-          else {
-            resolve();
-          }
-        })
-        .catch(err => { reject(err); });
+          .then(success => {
+            if (!success) {
+              // try again with catch-all address
+              iface.bindStatus.catchAll = true;
+            }
+            return success || mDNS.getReceiveSocket(iface);
+          })
+          .then(success => {
+            if (!success) {
+              reject();
+            }
+            else {
+              resolve();
+            }
+          })
+          .catch(err => {reject(err);});
       });
     },
 
@@ -131,37 +131,37 @@ module.exports = function (options) {
           type: (iface.family === 'IPv4' ? 'udp4' : 'udp6'),
           reuseAddr: mDNS.config.reuseAddr
         })
-        .on('error', (err) => {
-          if (iface.bindStatus.listening) {
-            mDNS.socketError(err);
-          }
-          else {
-            iface.socketRecv.close();
-            resolve(false);
-          }
-        })
-        .on('listening', () => {
-          iface.bindStatus.listening = true;
-          iface.socketRecv.setMulticastTTL(mDNS.config.ttl);
-          iface.socketRecv.setMulticastLoopback(mDNS.config.loopback);
-          try {
-            iface.socketRecv.addMembership(
-              (iface.family === 'IPv4' ? MDNS_IPV4 : MDNS_IPV6),
-              iface.bindStatus.address + (iface.family === 'IPv4' ? '' : '%' + iface.name)
-            );
-            resolve(true);
-          }
-          catch(e) {
-            iface.socketRecv.close();
-            iface.bindStatus.listening = false;
-            resolve(false);
-          }
-        })
-        .on('message', (msg, rinfo) => {
-          // include interface name so we know where the message came in
-          rinfo.interface = iface.name;
-          mDNS.socketOnMessage(msg, rinfo);
-        });
+          .on('error', (err) => {
+            if (iface.bindStatus.listening) {
+              mDNS.socketError(err);
+            }
+            else {
+              iface.socketRecv.close();
+              resolve(false);
+            }
+          })
+          .on('listening', () => {
+            iface.bindStatus.listening = true;
+            iface.socketRecv.setMulticastTTL(mDNS.config.ttl);
+            iface.socketRecv.setMulticastLoopback(mDNS.config.loopback);
+            try {
+              iface.socketRecv.addMembership(
+                (iface.family === 'IPv4' ? MDNS_IPV4 : MDNS_IPV6),
+                iface.bindStatus.address + (iface.family === 'IPv4' ? '' : '%' + iface.name)
+              );
+              resolve(true);
+            }
+            catch (e) {
+              iface.socketRecv.close();
+              iface.bindStatus.listening = false;
+              resolve(false);
+            }
+          })
+          .on('message', (msg, rinfo) => {
+            // include interface name so we know where the message came in
+            rinfo.interface = iface.name;
+            mDNS.socketOnMessage(msg, rinfo);
+          });
 
         if (iface.bindStatus.catchAll) {
           iface.bindStatus.address = iface.family === 'IPv4' ? '0.0.0.0' : '::';
@@ -179,20 +179,20 @@ module.exports = function (options) {
           type: (iface.family === 'IPv4' ? 'udp4' : 'udp6'),
           reuseAddr: mDNS.config.reuseAddr
         })
-        .once('error', (err) => {
-          emitter.emit('error', err);
-          reject();
-        })
-        .on('error', mDNS.socketError)
-        .on('listening', () => {
-          resolve();
-        })
-        .on('message', (msg, rinfo) => {
-          // include interface name so we know where the message came in
-          rinfo.interface = iface.name;
-          mDNS.socketOnMessage(msg, rinfo);
-        })
-        .bind(0, iface.address + (iface.family === 'IPv4' ? '' : '%' + iface.name));
+          .once('error', (err) => {
+            emitter.emit('error', err);
+            reject();
+          })
+          .on('error', mDNS.socketError)
+          .on('listening', () => {
+            resolve();
+          })
+          .on('message', (msg, rinfo) => {
+            // include interface name so we know where the message came in
+            rinfo.interface = iface.name;
+            mDNS.socketOnMessage(msg, rinfo);
+          })
+          .bind(0, iface.address + (iface.family === 'IPv4' ? '' : '%' + iface.name));
       });
     },
 
@@ -218,12 +218,12 @@ module.exports = function (options) {
       emitter.emit('packet', message, rinfo);
       switch (message.type) {
         case 'query':
-        emitter.emit('query', message, rinfo);
-        break;
+          emitter.emit('query', message, rinfo);
+          break;
 
         case 'response':
-        emitter.emit('response', message, rinfo);
-        break;
+          emitter.emit('response', message, rinfo);
+          break;
       }
     },
 
@@ -255,7 +255,7 @@ module.exports = function (options) {
             // unsupported family, internal interface, or special IPv6 prefix
             return;
           }
-          interfaces.push({ name: iface, address: assignment.address, family: assignment.family });
+          interfaces.push({name: iface, address: assignment.address, family: assignment.family});
         });
       });
       return interfaces;
