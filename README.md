@@ -1,3 +1,5 @@
+This is a react native friendly version of [mdns-server](https://github.com/bnielsen1965/mdns-server). All the credit to [bnielsen1965](https://github.com/bnielsen1965).
+
 # mdns-server
 
 Low level Multicast DNS implementation in pure javascript.
