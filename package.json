@@ -1,5 +1,5 @@
 {
-  "name": "mdns-server",
+  "name": "react-native-mdns-server",
   "version": "1.0.6",
   "description": "Low level Multicast DNS implementation in pure javascript.",
   "main": "index.js",
@@ -8,11 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bnielsen1965/mdns-server.git"
+    "url": "git+https://github.com/netbeast/react-native-mdns-server.git"
   },
   "author": "Bryan Nielsen (@bnielsen1965)",
   "license": "MIT",
   "dependencies": {
-    "dns-packet": "^1.1.1"
+    "dns-packet": "netbeast/react-native-dns-packet",
+    "react-native-os": "^1.2.1",
+    "react-native-udp": "^2.3.1",
+    "tiny-emitter": "^2.0.2"
   }
 }
