@@ -33,12 +33,14 @@ module.exports = function (options) {
       else if (mDNS.interfacesIsStrings(mDNS.config.interfaces)) {
         mDNS.config.interfaces = mDNS.interfacesFromStrings(mDNS.config.interfaces);
       }
+
       if (!mDNS.config.interfaces || !mDNS.config.interfaces.length) {
         throw new Error('No available interfaces.');
       }
-
       // create sockets on interfaces
-      mDNS.interfaces = mDNS.config.interfaces.slice();
+      mDNS.interfaces = mDNS.config.interfaces.slice()
+        .filter(i => i.family === 'IPv4')
+        .filter(i => !i.name.includes('dummy'));
       mDNS.createSockets()
         .then(() => {
           emitter.emit('ready');
@@ -127,7 +129,7 @@ module.exports = function (options) {
     // get a receive socket for the given interface
     getReceiveSocket: function (iface) {
       return new Promise((resolve, reject) => {
-        iface.socketRecv = dgram.createSocket({
+        const socketRecv = dgram.createSocket({
           type: (iface.family === 'IPv4' ? 'udp4' : 'udp6'),
           reuseAddr: mDNS.config.reuseAddr
         })
@@ -163,6 +165,7 @@ module.exports = function (options) {
             mDNS.socketOnMessage(msg, rinfo);
           });
 
+        iface.socketRecv = socketRecv
         if (iface.bindStatus.catchAll) {
           iface.bindStatus.address = iface.family === 'IPv4' ? '0.0.0.0' : '::';
         }
@@ -170,12 +173,13 @@ module.exports = function (options) {
           iface.bindStatus.address = iface.address;
         }
         iface.socketRecv.bind(MDNS_PORT, iface.bindStatus.address + (iface.family === 'IPv4' ? '' : '%' + iface.name));
+
       });
     },
 
     createSendSocket: function (iface) {
       return new Promise((resolve, reject) => {
-        iface.socketSend = dgram.createSocket({
+        const socket = dgram.createSocket({
           type: (iface.family === 'IPv4' ? 'udp4' : 'udp6'),
           reuseAddr: mDNS.config.reuseAddr
         })
@@ -183,16 +187,20 @@ module.exports = function (options) {
             emitter.emit('error', err);
             reject();
           })
-          .on('error', mDNS.socketError)
+          .on('error', (err) => {
+            mDNS.socketError
+          })
           .on('listening', () => {
-            resolve();
+            resolve(true);
           })
           .on('message', (msg, rinfo) => {
             // include interface name so we know where the message came in
             rinfo.interface = iface.name;
             mDNS.socketOnMessage(msg, rinfo);
           })
-          .bind(0, iface.address + (iface.family === 'IPv4' ? '' : '%' + iface.name));
+
+        iface.socketSend = socket
+        iface.socketSend.bind(0, iface.address + (iface.family === 'IPv4' ? '' : '%' + iface.name));
       });
     },
 
@@ -214,7 +222,6 @@ module.exports = function (options) {
         emitter.emit('warning', err);
         return;
       }
-
       emitter.emit('packet', message, rinfo);
       switch (message.type) {
         case 'query':
@@ -332,16 +339,20 @@ module.exports = function (options) {
           return cb();
         }
         else if (interfaces[ii].socketSend) {
-          interfaces[ii].socketSend.send(
-            message,
-            0,
-            message.length,
-            MDNS_PORT,
-            (interfaces[ii].family === 'IPv4' ? MDNS_IPV4 : MDNS_IPV6),
-            function () {
-              processInterface(ii + 1);
-            }
-          );
+          try {
+
+            interfaces[ii].socketSend.send(
+              message,
+              0,
+              message.length,
+              MDNS_PORT,
+              (interfaces[ii].family === 'IPv4' ? MDNS_IPV4 : MDNS_IPV6),
+              function (err) {
+                processInterface(ii + 1);
+              });
+          } catch (error) {
+            console.log({error})
+          }
         }
         else {
           // interface did not have socket
