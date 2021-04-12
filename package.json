@@ -14,7 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "react-native-dns-packet": "netbeast/react-native-dns-packet",
-    "react-native-os": "^1.2.1",
+    "react-native-os": "^1.2.6",
     "react-native-udp": "2.1.0",
     "tiny-emitter": "^2.0.2"
   }
